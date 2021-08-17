@@ -309,3 +309,29 @@ void disk_write(const FileSpecification *fs, int *pages, uint8_t *buf, int pagen
 #endif
 }
 
+void append_page(const FileSpecification *fs, uint8_t *buf) {
+    int flag;
+    IDX_FILE file;
+    size_t written;
+    
+    if (fs->io_access == NORMAL_ACCESS)
+        flag = O_CREAT | O_RDWR | O_APPEND;
+    else if (fs->io_access == DIRECT_ACCESS) {
+        flag = O_CREAT | O_RDWR | O_APPEND | O_DIRECT;
+    } else {
+        _DEBUGF(WARNING, "Unknown access %d to open disk", fs->io_access);
+        flag = O_CREAT | O_RDWR | O_APPEND; //default access
+    }
+
+    if ((file = open(fs->index_path, flag, S_IRUSR | S_IWUSR)) < 0) {
+        _DEBUGF(ERROR, "It was impossible to open the \'%s\'. "
+                "It used the following access - %d", fs->index_path, fs->io_access);
+    }
+
+    if ((written = write(file, buf, fs->page_size)) != fs->page_size) {
+        _DEBUGF(ERROR, "Written size (%zu) not equal to buffer size (%d)\n", written, fs->page_size);
+        return;
+    }
+    
+    close(file);
+}

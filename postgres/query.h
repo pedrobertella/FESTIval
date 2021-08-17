@@ -44,8 +44,9 @@ v. 30, n. 2, p. 170–231, 1998.
 #define POINT_QUERY_TYPE                3
 
 /*Types of processing of a spatial query*/
-#define FILTER_AND_REFINEMENT_STEPS  1
-#define ONLY_FILTER_STEP             2
+#define FILTER_AND_REFINEMENT_STEPS             1
+#define ONLY_FILTER_STEP                        2
+#define FILTER_REFINEMENT_AND_APPROX_STEPS      3
 
 typedef struct {
     int nofentries; //number of entries of the query
@@ -77,9 +78,11 @@ extern void query_set_processor_ss(filter_step_processor_ss f, refinement_step_p
  * predicate = the predicate to be considered
  * query_type = the type of the query to be processed (see above)
  * processing_type = which step of the query we will process (see above)
+ * approx = paths of the approximation files, if they exist
+ * nof_approxs = number of approximation files
  */
 QueryResult *process_spatial_selection(SpatialIndex *si, LWGEOM *input, 
-        uint8_t predicate, uint8_t query_type, uint8_t processing_type);
+        uint8_t predicate, uint8_t query_type, uint8_t processing_type, FileSpecification *approxs, int nof_approxs);
 
 #endif /* QUERY_H */
 

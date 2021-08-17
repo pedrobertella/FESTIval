@@ -1,0 +1,5 @@
+N_CORNER.o: N_CORNER.cpp N_CORNER.h Common.h
+
+N_CORNER.h:
+
+Common.h:

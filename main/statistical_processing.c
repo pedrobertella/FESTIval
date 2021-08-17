@@ -17,10 +17,12 @@
 #include <libgen.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <float.h>
 
 #include "statistical_processing.h"
 #include "bbox_handler.h"
-#include "spatial_approximation.h"
+#include "../approximations/SpatialApproximation_utils.h"
+
 
 #include "log_messages.h"
 #include "storage_handler.h"
@@ -130,6 +132,10 @@ DynamicArrayInt *_writes_per_height = NULL;
 DynamicArrayInt *_reads_per_height = NULL;
 RWOrder *_rw_order = NULL;
 int _height = 0; //height of the tree (done)
+
+ApproxInfo *_cpu_time_per_approx = NULL; 
+ApproxInfo *_time_per_approx = NULL;
+ApproxCand *_cand_per_approx = NULL;
 
 /* variable for the collection of statistical data of standard buffers (e.g., LRU) */
 int _sbuffer_page_fault = 0;
@@ -285,6 +291,22 @@ void statistic_free_allocated_memory() {
         lwfree(_rw_order->time);
         lwfree(_rw_order);
         _rw_order = NULL;
+    }
+    if(_cpu_time_per_approx != NULL){
+        lwfree(_cpu_time_per_approx->time);
+        lwfree(_cpu_time_per_approx->approx_type);
+        lwfree(_cpu_time_per_approx);
+        _cpu_time_per_approx = NULL;
+    }
+    if(_time_per_approx != NULL){
+        lwfree(_time_per_approx->time);
+        lwfree(_time_per_approx->approx_type);
+        lwfree(_time_per_approx);
+        _time_per_approx = NULL;
+    }
+    if(_cand_per_approx != NULL){
+        lwfree(_cand_per_approx);
+        _cand_per_approx = NULL;
     }
 }
 
@@ -481,6 +503,37 @@ NodeInfo *create_nodeinfo(int level, int id, double db_value, int int_value) {
     ret->level = level;
     ret->int_value = int_value;
     return ret;
+}
+
+ApproxInfo *create_approxinfo(int nofelements) {
+    ApproxInfo *info;
+    info = (ApproxInfo*) lwalloc(sizeof(ApproxInfo));
+    info->approx_type = lwalloc(nofelements * sizeof(uint8_t));
+    info->time = lwalloc(nofelements * sizeof(double));
+    info->nofelements = 0;
+    return info;
+}
+
+void insert_approxinfo(ApproxInfo *infos, double time, uint8_t approx_type) {
+    infos->approx_type[infos->nofelements] = approx_type;
+    infos->time[infos->nofelements] = time;
+    infos->nofelements++;
+}
+
+ApproxCand *create_approxcand(int nofelements){
+    ApproxCand *cands;
+    cands = (ApproxCand*) lwalloc(nofelements * sizeof(ApproxCand));
+    return cands;
+}
+
+void insert_approxcand(uint64_t cand_in, uint64_t cand_out, uint8_t approx_type, uint8_t order, uint8_t total){
+    ApproxCand ap_cand;
+    ap_cand.approx_type = approx_type;
+    ap_cand.order = order;
+    ap_cand.total = total;
+    ap_cand.cand_in = cand_in;
+    ap_cand.cand_out = cand_out;
+    _cand_per_approx[order-1] = ap_cand;
 }
 
 /*these function get data from postgres and they are now deprecated
@@ -957,6 +1010,7 @@ int insert_execution(const SpatialIndex *si, int idx_id, uint8_t variant, const 
     stringbuffer_append(sb, "index_time, ");
     stringbuffer_append(sb, "filter_time, ");
     stringbuffer_append(sb, "refinement_time, ");
+    stringbuffer_append(sb, "approximations_time, ");
     stringbuffer_append(sb, "retrieving_objects_time, ");
     stringbuffer_append(sb, "processing_predicates_time, ");
     stringbuffer_append(sb, "read_time, ");
@@ -966,6 +1020,7 @@ int insert_execution(const SpatialIndex *si, int idx_id, uint8_t variant, const 
     stringbuffer_append(sb, "index_cpu_time, ");
     stringbuffer_append(sb, "filter_cpu_time, ");
     stringbuffer_append(sb, "refinement_cpu_time, ");
+    stringbuffer_append(sb, "approximations_cpu_time, ");
     stringbuffer_append(sb, "retrieving_objects_cpu_time, ");
     stringbuffer_append(sb, "processing_predicates_cpu_time, ");
     stringbuffer_append(sb, "read_cpu_time, ");
@@ -975,6 +1030,7 @@ int insert_execution(const SpatialIndex *si, int idx_id, uint8_t variant, const 
     stringbuffer_append(sb, "reinsertion_num, ");
     stringbuffer_append(sb, "cand_num, ");
     stringbuffer_append(sb, "result_num, ");
+    stringbuffer_append(sb, "inter_cand_num, ");
     stringbuffer_append(sb, "reads_num, ");
     stringbuffer_append(sb, "writes_num, ");
     stringbuffer_append(sb, "split_int_num, ");
@@ -1068,6 +1124,22 @@ int insert_execution(const SpatialIndex *si, int idx_id, uint8_t variant, const 
     stringbuffer_aprintf(sb, "%.17g, ", _filter_time);
     //refinement_time
     stringbuffer_aprintf(sb, "%.17g, ", _refinement_time);
+    //approximations_time
+    stringbuffer_append(sb, "'[");
+    if (_time_per_approx != NULL) {
+        if (_time_per_approx->nofelements == 0)
+          n = 1;
+        else
+          n = _time_per_approx->nofelements;
+         for (i = 0; i < n; i++) {
+            if (i > 0)
+                stringbuffer_append(sb, ", ");
+
+            stringbuffer_aprintf(sb, "{\"cpu_time\": %.17g, \"approx_type\": \"%s\"}", 
+            _time_per_approx->time[i], get_approx_name(_time_per_approx->approx_type[i]));
+        }
+    }    
+    stringbuffer_append(sb, "]'::jsonb, ");
     //retrieving_objects_time
     stringbuffer_aprintf(sb, "%.17g, ", _retrieving_objects_time);
     //processing_predicates_time
@@ -1086,6 +1158,22 @@ int insert_execution(const SpatialIndex *si, int idx_id, uint8_t variant, const 
     stringbuffer_aprintf(sb, "%.17g, ", _filter_cpu_time);
     //refinement_cpu_time
     stringbuffer_aprintf(sb, "%.17g, ", _refinement_cpu_time);
+    //approximations_cpu_time
+    stringbuffer_append(sb, "'[");
+    if (_cpu_time_per_approx != NULL) {
+        if (_cpu_time_per_approx->nofelements == 0)
+          n = 1;
+        else
+          n = _cpu_time_per_approx->nofelements;
+         for (i = 0; i < n; i++) {
+            if (i > 0)
+                stringbuffer_append(sb, ", ");
+
+            stringbuffer_aprintf(sb, "{\"time\": %.17g, \"approx_type\": \"%s\"}", 
+            _cpu_time_per_approx->time[i], get_approx_name(_cpu_time_per_approx->approx_type[i]));
+        }
+    }    
+    stringbuffer_append(sb, "]'::jsonb, ");
     //retrieving_objects_cpu_time
     stringbuffer_aprintf(sb, "%.17g, ", _retrieving_objects_cpu_time);
     //processing_predicates_cpu_time
@@ -1104,6 +1192,22 @@ int insert_execution(const SpatialIndex *si, int idx_id, uint8_t variant, const 
     stringbuffer_aprintf(sb, "%d, ", _cand_num);
     //result_num
     stringbuffer_aprintf(sb, "%d, ", _result_num);
+    //inter_cand_num
+    stringbuffer_append(sb, "'[");
+    if (_cand_per_approx != NULL) {
+        if (_cand_per_approx[0].total == 0)
+          n = 0;
+        else
+          n = _cand_per_approx[0].total;
+         for (i = 0; i < n; i++) {
+            if (i > 0)
+                stringbuffer_append(sb, ", ");
+
+            stringbuffer_aprintf(sb, "{\"order\": %d, \"approx_type\": \"%s\", \"cand_in\": %d, \"cand_out\": %d}", 
+            _cand_per_approx[i].order, get_approx_name(_cand_per_approx[i].approx_type), _cand_per_approx[i].cand_in, _cand_per_approx[i].cand_out);
+        }
+    }    
+    stringbuffer_append(sb, "]'::jsonb, ");
     //reads_num
     stringbuffer_aprintf(sb, "%d, ", _read_num);
     //write_num

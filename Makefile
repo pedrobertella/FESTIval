@@ -13,11 +13,15 @@
 # **********************************************************************/
 
 POSTGIS_SOURCE=$(postgis)
-FLASHDBSIM_SOURCE=Flash-DBSim-for-Linux-1.0
+FLASHDBSIM_SOURCE=$(realpath libraries/Flash-DBSim-for-Linux-1.0)
+APPROX_SOURCE=$(realpath libraries/Approx)
 
 $(shell python3 gen_config_h.py $(POSTGIS_SOURCE)/postgis_config.h)
 $(info Compiling FlashDBSim...)
-$(shell make -s -C $(FLASHDBSIM_SOURCE)/)
+#$(shell make -s -C $(FLASHDBSIM_SOURCE)/)
+$(info Done.)
+$(info Compiling Approx library...)
+$(shell make -s -C $(APPROX_SOURCE)/)
 $(info Done.)
 
 MODULE_big=festival-1.1
@@ -28,6 +32,7 @@ OBJS= \
     main/festival_util.o \
     main/header_handler.o \
     main/statistical_processing.o \
+    main/lwgeom_handler.o \
     rtree/rnode_stack.o \
     rtree/rnode.o \
     rtree/split.o \
@@ -66,16 +71,24 @@ OBJS= \
     buffer/lru.o \
     buffer/hlru.o \
     buffer/s2q.o \
+    approximations/bbox_approx_handler.o \
+    approximations/mbc_handler.o \
+    approximations/mbe_handler.o \
+    approximations/n-corner_handler.o \
+    approximations/rmbp_handler.o \
+    approximations/rmbr_handler.o \
+    approximations/SpatialApproximation_utils.o \
     postgres/query.o \
     postgres/execution.o \
+    postgres/approx_execution.o \
     postgres/festival_module.o \
     flashdbsim/flashdbsim.o
 EXTENSION = festival
 DATA = festival--1.1.sql
 
-SHLIB_LINK = $(POSTGIS_SOURCE)/libpgcommon/libpgcommon.a $(POSTGIS_SOURCE)/postgis/postgis-*.so $(FLASHDBSIM_SOURCE)/C_API/libflashdb_capi.so -L/usr/local/lib -lgeos_c -llwgeom -lrt
+SHLIB_LINK = $(POSTGIS_SOURCE)/libpgcommon/libpgcommon.a $(POSTGIS_SOURCE)/postgis/postgis-*.so $(FLASHDBSIM_SOURCE)/C_API/libflashdb_capi.so $(APPROX_SOURCE)/build/libApprox.so -L/usr/local/lib -lgeos_c -lrt -llwgeom
 
-PG_CPPFLAGS = -I/usr/local/include -I$(POSTGIS_SOURCE)/liblwgeom/ -I$(POSTGIS_SOURCE)/libpgcommon/ -I$(POSTGIS_SOURCE)/postgis/ -I$(FLASHDBSIM_SOURCE)/C_API/include/ -I/usr/include/ -fPIC
+PG_CPPFLAGS = -I/usr/local/include -I$(POSTGIS_SOURCE)/liblwgeom/ -I$(POSTGIS_SOURCE)/libpgcommon/ -I$(POSTGIS_SOURCE)/postgis/ -I$(FLASHDBSIM_SOURCE)/C_API/include/ -I$(APPROX_SOURCE) -I/usr/include/ -fPIC 
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)

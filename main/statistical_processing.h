@@ -63,6 +63,18 @@ typedef struct {
     NodeInfo **array;
 } ArrayNode;
 
+typedef struct {
+    double *time;
+    uint8_t *approx_type;
+    int nofelements;
+} ApproxInfo;
+
+typedef struct {
+    uint8_t approx_type;
+    uint64_t cand_in, cand_out;
+    uint8_t order, total;
+} ApproxCand;
+
 /*
 ** Variants for collection of statistical data
 */
@@ -118,6 +130,9 @@ extern int _deleted_leaf_node_num; //number of deleted leaf nodes in an operatio
 extern DynamicArrayInt *_writes_per_height; //number of writes (for modification or remotion) per level of the tree (this is an array) (done)
 extern DynamicArrayInt *_reads_per_height; //number of reads per level of the tree (this is an array) (done)
 extern RWOrder *_rw_order; //an array with the order of the read write request and the page number of this request (done)
+extern ApproxInfo *_cpu_time_per_approx; //an array with the CPU time for each approximation (done)
+extern ApproxInfo *_time_per_approx; //an array with the processing time for each approximation (done)
+extern ApproxCand *_cand_per_approx; //an array with the order of execution of each approximation (done)
 
 /* variables to collect statistical information regarding to flushing operations */
 extern double _flushing_time; //time to flush a part of buffer to SSD (done)
@@ -219,6 +234,11 @@ extern void insert_reads_per_height(int height, int incremented_v);
 
 /*this function appends a read/write request of a given page number */
 extern void append_rw_order(int page_num, uint8_t type, double time);
+
+extern ApproxInfo *create_approxinfo(int nofelements);
+extern void insert_approxinfo(ApproxInfo *infos, double time, uint8_t approx_type);
+extern ApproxCand *create_approxcand(int nofelements);
+extern void insert_approxcand(uint64_t cand_in, uint64_t cand_out, uint8_t approx_type, uint8_t order, uint8_t total);
 
 //this function free allocated memory
 extern void statistic_free_allocated_memory(void);

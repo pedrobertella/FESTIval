@@ -11,7 +11,7 @@
 #define FESTIVAL_GEOS_VERSION 39
 
 /* PostGIS version */
-#define FESTIVAL_POSTGIS_VERSION 312
+#define FESTIVAL_POSTGIS_VERSION 255
 
 /* PostgreSQL server version */
 #define FESTIVAL_PGSQL_VERSION 120

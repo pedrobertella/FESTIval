@@ -12,7 +12,7 @@
  *
  **********************************************************************/
 
-/* this the main file that define the postgresql functions */
+/* this is the main file that define the postgresql functions */
 /*needed libraries from postgres*/
 #include "postgres.h"
 #include "funcapi.h"
@@ -1064,7 +1064,7 @@ Datum STI_store_collected_statistical_data(PG_FUNCTION_ARGS) {
             _DEBUG(ERROR, "You must inform the complete path of a file in order to store the statistical data!");
         variant |= SO_STORE_STATISTICAL_IN_FILE;
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
         statistic_file = text_to_cstring(PG_GETARG_TEXT_PP(4));
 
@@ -1107,7 +1107,7 @@ Datum STI_store_collected_statistical_data(PG_FUNCTION_ARGS) {
         variant |= SO_FLASHSIMULATOR;
     }
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1200,7 +1200,7 @@ Datum STI_store_index_snapshot(PG_FUNCTION_ARGS) {
             _DEBUG(ERROR, "You must inform the complete path of a file in order to store the statistical data!");
         variant |= SO_STORE_STATISTICAL_IN_FILE;
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     statistic_file = text_to_cstring(PG_GETARG_TEXT_PP(4));
 
@@ -1216,7 +1216,7 @@ Datum STI_store_index_snapshot(PG_FUNCTION_ARGS) {
         variant |= SO_PRINTINDEX;
     }
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1269,7 +1269,7 @@ Datum STI_set_execution_name(PG_FUNCTION_ARGS) {
         _execution_name = NULL;
     }
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     _execution_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
 
@@ -1326,7 +1326,7 @@ Datum STI_create_empty_index(PG_FUNCTION_ARGS) {
         buf_id = PG_GETARG_INT32(6);
     }
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(index_name_t);
     index_path = text_to_cstring(index_path_t);
@@ -1499,7 +1499,7 @@ Datum STI_create_empty_index(PG_FUNCTION_ARGS) {
     lwfree(index_path);
 
     MemoryContextSwitchTo(oldcontext);
-
+    
     PG_RETURN_BOOL(true);
 }
 
@@ -1526,7 +1526,7 @@ Datum STI_finish_fai(PG_FUNCTION_ARGS) {
     oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1648,7 +1648,7 @@ Datum STI_finish_buffer(PG_FUNCTION_ARGS) {
     // this will survives until a restart of the server
     oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1726,7 +1726,7 @@ Datum STI_insert_entry(PG_FUNCTION_ARGS) {
     // this will survives until a restart of the server
     oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1751,6 +1751,7 @@ Datum STI_insert_entry(PG_FUNCTION_ARGS) {
     if ((!lwgeom->bbox) && (!lwgeom_is_empty(lwgeom))) {
         lwgeom_add_bbox(lwgeom);
     }
+    
 
 
     //_DEBUG(NOTICE, "getting the index");
@@ -1773,7 +1774,7 @@ Datum STI_insert_entry(PG_FUNCTION_ARGS) {
     //_DEBUG(NOTICE, "inserting the entry");
 
     spatialindex_insert(si, pointer, lwgeom);
-
+    
 #ifdef COLLECT_STATISTICAL_DATA
     cpuend = get_CPU_time();
     end = get_current_time();
@@ -1826,7 +1827,7 @@ Datum STI_remove_entry(PG_FUNCTION_ARGS) {
     oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1912,7 +1913,7 @@ Datum STI_update_entry(PG_FUNCTION_ARGS) {
     // this will survives until a restart of the server
     oldcontext = MemoryContextSwitchTo(TopMemoryContext);
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -1992,7 +1993,7 @@ PG_FUNCTION_INFO_V1(STI_query_spatial_index);
 
 Datum STI_query_spatial_index(PG_FUNCTION_ARGS) {
 
-#if FESTIVAL_POSTGIS_VERSION >= 300
+#if FESTIVAL_PGSQL_VERSION >= 120
 
     char *index_name = text_to_cstring(PG_GETARG_TEXT_PP(0));
     char *index_path = text_to_cstring(PG_GETARG_TEXT_PP(1));
@@ -2081,7 +2082,7 @@ Datum STI_query_spatial_index(PG_FUNCTION_ARGS) {
 
     /*the index_time is collected inside this function
      the reason is that the query is processed in two steps: filtering and refinement*/
-    result = process_spatial_selection(si, lwgeom, predicate, type_query, type_of_processing);
+    result = process_spatial_selection(si, lwgeom, predicate, type_query, type_of_processing, NULL, 0);
 
     lwgeom_free(lwgeom);
     lwfree(spc_path);

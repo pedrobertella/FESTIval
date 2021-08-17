@@ -23,7 +23,7 @@
 #define HILBER_VALUE_H
 
 #include "srid.h"
-#include "../main/spatial_approximation.h"
+#include "../approximations/SpatialApproximation.h"
 
 #define RESOLUTION              ((8*sizeof(unsigned long long)) / NUM_OF_DIM) 
 

@@ -24,7 +24,7 @@
 
 #include <liblwgeom.h>
 #include <stdbool.h>
-#include "spatial_approximation.h"
+#include "../approximations/SpatialApproximation.h"
 
 /* definition of a multidimensional bounding box 
  * min and max are arrays

@@ -494,7 +494,7 @@ void insert_entry(RTree *rtree, REntry *input, int height) {
         max_entries = rtree->spec->max_entries_int_node;
     }
 
-    // _DEBUG(NOTICE, "inserting a new entry");
+     //_DEBUG(NOTICE, "inserting a new entry");
 
     /*I1 [Find position for new record ] Invoke ChooseLeaf to select a leaf
  node L in which to place E --> L in this case is our chosen_node
@@ -502,8 +502,8 @@ void insert_entry(RTree *rtree, REntry *input, int height) {
      e.g., 0 for leaf nodes or greater than 0 (to reinsert from the delete operation)*/
     chosen_node = choose_node(rtree, input, height, stack, &chosen_address);
 
-    //    _DEBUG(NOTICE, "node chosen");
-    //    rnode_print(chosen_node, chosen_address);
+        //_DEBUG(NOTICE, "node chosen");
+        //rnode_print(chosen_node, chosen_address);
 
     //we add the entry here without checking
     rnode_add_rentry(chosen_node, input);
@@ -513,7 +513,7 @@ Otherwise invoke SplitNode to obtain L and LL containing E and all the
 old entrees of L
      That is: if the new entry E does not fit in chosen_node, then we obtain L and LL */
     if (chosen_node->nofentries <= max_entries) {
-        //    _DEBUG(NOTICE, "the node chosen has enough space to insert the new entry");
+            //_DEBUG(NOTICE, "the node chosen has enough space to insert the new entry");
         /*then we can write the node with the new entry*/
         if (rtree->type == CONVENTIONAL_RTREE) {
             put_rnode(&rtree->base, chosen_node, chosen_address, height);

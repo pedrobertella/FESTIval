@@ -52,6 +52,8 @@ for instance, pages 1, 2, and 3 will be sequentially written in only one raw_rea
 extern void disk_write(const FileSpecification *fs, int *pages, uint8_t *buf, int pagenum);
 extern void disk_read(const FileSpecification *fs, int *pages, uint8_t *buf, int pagenum);
 
+/* Appends a single page to a file */
+extern void append_page(const FileSpecification *fs, uint8_t *buf);
 
 #endif /* _IO_HANDLER_H */
 

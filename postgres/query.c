@@ -23,6 +23,8 @@
 #include <liblwgeom.h>
 #include <liblwgeom.h> //because of text2cstring
 
+#include "../approximations/SpatialApproximation_utils.h"
+
 #include "../main/log_messages.h"
 #include "../main/statistical_processing.h" /* to collect statistical data */
 #include "executor/executor.h"
@@ -401,7 +403,7 @@ LWGEOM **retrieve_geoms_from_postgres(const Source *src, int *row_ids, int count
 
     if (SPI_processed <= 0) {
         SPI_finish();
-        _DEBUG(ERROR, "retrieve_geoms_from_postgres: returned 0 tuples")
+        _DEBUG(ERROR, "retrieve_geoms_from_postgres: returned 0 tuples");
         return NULL;
     }
 
@@ -621,10 +623,11 @@ int process_predicate(LWGEOM *input, LWGEOM *geom, uint8_t p, uint8_t refin) {
  (ii) generic object as input, named object query,
  (iii) point query, which considers the input as a point object
  * TO include other types of queries.
- * processing_type refers to the execution of (i) only filter step, (ii) or filter plus refinement step.
+  * processing_type refers to the execution of (i) only filter step, (ii) filter plus refinement step, 
+ * or (iii) using intermediate steps.
  */
 QueryResult *process_spatial_selection(SpatialIndex *si, LWGEOM *input,
-        uint8_t predicate, uint8_t query_type, uint8_t processing_type) {
+        uint8_t predicate, uint8_t query_type, uint8_t processing_type, FileSpecification *approxs, int nof_approxs) {
     SpatialIndexResult *sir;
     QueryResult *result = NULL;
 
@@ -650,7 +653,74 @@ QueryResult *process_spatial_selection(SpatialIndex *si, LWGEOM *input,
         }
         
         spatial_index_result_free(sir);
-    } else {
+    } else if(processing_type == FILTER_REFINEMENT_AND_APPROX_STEPS) {
+        /* execution of the filter step*/
+        sir = filter_step_ss(si, input, predicate, query_type);
+
+        if(!sir->final_result){
+            /* execution of the intermediate steps */
+            int *temp_ids, i;
+            SpatialApproximation *bbox;
+            SpatialApproximation **ap;
+            SpatialIndexResult *sir_approxs = lwalloc(sizeof(SpatialIndexResult));
+
+#ifdef COLLECT_STATISTICAL_DATA
+            struct timespec cpustart;
+            struct timespec cpuend;
+            struct timespec start;
+            struct timespec end;
+            uint64_t cand_in;
+            _cpu_time_per_approx = create_approxinfo(nof_approxs);
+            _time_per_approx = create_approxinfo(nof_approxs);
+            _cand_per_approx = create_approxcand(nof_approxs);
+#endif
+
+            //Build SpatialApproximation from input lwgeom
+            bbox = create_bbox_approx(input, 0);
+
+            //iterate approximations and validate predicate
+            sir_approxs->row_id =  sir->row_id;
+            sir_approxs->num_entries = sir->num_entries;
+
+            for(i = 0; i < nof_approxs; i++) {
+                temp_ids = sir_approxs->row_id;
+
+#ifdef COLLECT_STATISTICAL_DATA
+                cpustart = get_CPU_time();
+                start = get_current_time();
+                cand_in = sir_approxs->num_entries;
+#endif
+                //_DEBUGF(INFO, "Processing approx: %s\nNumber of candidates: %d", approxs[i].index_path, sir_approxs->num_entries);
+                ap = spatialapproximation_get_from_list(sir_approxs->row_id, sir_approxs->num_entries, get_approx_type(approxs[i].index_path), &(approxs[i]));
+                sir_approxs->row_id = spatialapproximation_filter(bbox, sir_approxs->num_entries, ap, predicate, &(sir_approxs->num_entries));
+
+
+#ifdef COLLECT_STATISTICAL_DATA
+                cpuend = get_CPU_time();
+                end = get_current_time();
+
+                insert_approxinfo(_cpu_time_per_approx, get_elapsed_time(cpustart, cpuend), get_approx_type(approxs[i].index_path));
+                insert_approxinfo(_time_per_approx, get_elapsed_time(start, end), get_approx_type(approxs[i].index_path));
+                insert_approxcand(cand_in, sir_approxs->num_entries, get_approx_type(approxs[i].index_path), i+1, nof_approxs);
+#endif
+
+                spatialapproximation_free_array(sir_approxs->num_entries, ap);
+                lwfree(temp_ids);
+            }
+            //memory management and return to main SpatialIndexResult
+            sir->num_entries = sir_approxs->num_entries;
+            sir->row_id = sir_approxs->row_id;
+            lwfree(sir_approxs);
+        }
+
+        /* execution of the refinement step*/
+        //_DEBUGF(INFO, "Candidates for refinement: %d", sir->num_entries);
+        result = refinement_step_ss(sir, si->src, si->gp, input, predicate);
+
+        spatial_index_result_free(sir);
+    }
+    
+    else {
         _DEBUGF(ERROR, "Invalid parameter value for processing_option (%d)", processing_type);
     }
 

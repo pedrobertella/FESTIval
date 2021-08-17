@@ -272,6 +272,7 @@ CREATE TABLE fds.Execution (
   index_time NUMERIC NULL,
   filter_time NUMERIC NULL,
   refinement_time NUMERIC NULL,
+  approximations_time JSONB NULL,
   retrieving_objects_time NUMERIC NULL,
   processing_predicates_time NUMERIC NULL,
   read_time NUMERIC NULL,
@@ -281,6 +282,7 @@ CREATE TABLE fds.Execution (
   index_cpu_time NUMERIC NULL,
   filter_cpu_time NUMERIC NULL,
   refinement_cpu_time NUMERIC NULL,
+  approximations_cpu_time JSONB NULL,
   retrieving_objects_cpu_time NUMERIC NULL,
   processing_predicates_cpu_time NUMERIC NULL,
   read_cpu_time NUMERIC NULL,
@@ -290,6 +292,7 @@ CREATE TABLE fds.Execution (
   reinsertion_num INTEGER NULL,
   cand_num INTEGER NULL,
   result_num INTEGER NULL,
+  inter_cand_num JSONB NULL,
   writes_num INTEGER NULL,
   reads_num INTEGER NULL,
   split_int_num INTEGER NULL,
@@ -867,3 +870,54 @@ $$
 	SELECT FT_CreateSpatialIndex(index_id, index_path || index_name, src_id, bc_id, sc_id, buf_id, apply_fai, apply_stdbuffer, statistic_options, location_statistics, file_statistics)
 $$ 
 LANGUAGE SQL;
+
+----------------------------------------------------------------------------------------------
+--------------------------- APPROXIMATION OPERATIONS -----------------------------------------
+----------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------
+--       FUNCTIONS RELATED TO THE MANAGEMENT OF APPROXIMATIONS         --
+-------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION FT_BuildApproximations(path_name text, approx_id int4, src_id int4)
+	RETURNS bool
+	AS 'MODULE_PATHNAME', 'STI_build_approximations'
+	LANGUAGE 'c' VOLATILE STRICT;
+
+CREATE OR REPLACE FUNCTION FT_ABuildApproximations(path_name text, approx_id int4, src_id int4, index_name text, index_path text, statistic_options int4 default 1, location_statistics int4 default 1, file_statistics text default NULL)
+	RETURNS int4 AS
+$BODY$
+BEGIN
+	--we start to collect the statistical data of the related approximation
+	PERFORM FT_StartCollectStatistics();
+	--we perform the update
+	PERFORM FT_BuildApproximations(path_name, approx_id, src_id);
+	--we collect and store all the statistical data related to the spatial index creation
+	RETURN FT_StoreStatisticalData(index_name, index_path, statistic_options, location_statistics, file_statistics);
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
+
+CREATE OR REPLACE FUNCTION FT_QuerySpatialIndex(index_name text, index_path text, type_query int4, obj geometry, predicate int4, approx_paths text[])
+  RETURNS SETOF __query_result
+	AS 'MODULE_PATHNAME', 'STI_query_spatial_index_with_approx'
+	LANGUAGE 'c' VOLATILE STRICT;
+
+CREATE OR REPLACE FUNCTION FT_AQuerySpatialIndex(index_name text, index_path text, type_query int4, obj geometry, predicate int4, approx_paths text[], statistic_options int4 default 1, location_statistics int4 default 1, file_statistics text default NULL)
+	RETURNS SETOF __query_result AS
+$BODY$
+BEGIN
+	--we start to collect the statistical data of the related approximation
+	PERFORM FT_StartCollectStatistics();
+	--we perform the update
+	RETURN QUERY SELECT * FROM  FT_QuerySpatialIndex(index_name, index_path, type_query, obj, predicate, approx_paths);
+	--we collect and store all the statistical data related to the spatial index creation
+	PERFORM FT_StoreStatisticalData(index_name, index_path, statistic_options, location_statistics, file_statistics);
+
+  RETURN;
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
